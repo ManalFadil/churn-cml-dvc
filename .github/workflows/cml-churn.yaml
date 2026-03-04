@@ -74,6 +74,11 @@ jobs:
 
           # 4. Push vers S3
           dvc push
+          
+      - name: Debug dataset path
+        run: |
+          echo "Listing project structure"
+          ls -R data || echo "data folder missing"
 
       # 7️⃣ Publication du rapport CML
       - name: Publish CML report
