@@ -1,36 +1,50 @@
 name: churn-imbalanced-dataset
+
 on: [push]
 permissions: write-all
+
 jobs:
   run:
     runs-on: ubuntu-latest
     steps:
+      # 1. Checkout
       - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: "16"
+
+      # 2. Setup Python
       - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
+
+      # 3. Setup Node (pour CML)
+      - uses: actions/setup-node@v3
+        with:
+          node-version: "16"
+
+      # 4. Setup CML
       - uses: iterative/setup-cml@v1
 
-      - name: Prepare Environment
+      # 5. Installer dépendances et DVC
+      - name: Install dependencies
         run: |
-          # Your ML workflow goes here
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          python script.py
+          pip install dvc[s3]
 
-      - name: Pull data with DVC
-        run: dvc pull
-
-      # ← Ajout de la configuration AWS ici
+      # 6. Configurer AWS pour DVC
       - name: Configure AWS credentials
         run: |
           echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
           echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
           echo "AWS_DEFAULT_REGION=${{ secrets.AWS_DEFAULT_REGION }}" >> $GITHUB_ENV
 
+      # 7. Télécharger les données depuis DVC
+      - name: Pull data with DVC
+        run: dvc pull
+
+      # 8. Exécuter le script Python
+      - name: Run script
+        run: python script.py
+        
       - name: Generate Report
         env:
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
