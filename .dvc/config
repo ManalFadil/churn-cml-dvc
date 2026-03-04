@@ -3,5 +3,3 @@
 ['remote "myremote"']
     url = s3://my-bucket-dvc-mfadil/dvc-storage
     region = eu-west-3
-    access_key_id = AKIAAKIASQXFSVXZOQMXJMZC
-    secret_access_key = UUlKfG5Fu3/CfAbM+/Rx08BBSleBKH/TkBkXIsVp
