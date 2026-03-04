@@ -1,58 +1,90 @@
 name: churn-imbalanced-dataset
 
-on: [push]
-permissions: write-all
+on:
+  push:
+
+permissions:
+  contents: write
 
 jobs:
   run:
     runs-on: ubuntu-latest
-    steps:
-      # 1. Checkout
-      - uses: actions/checkout@v3
 
-      # 2. Setup Python
-      - uses: actions/setup-python@v4
+    steps:
+      # 1️⃣ Checkout du repo
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      # 2️⃣ Setup Python
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
         with:
           python-version: "3.11"
 
-      # 3. Setup Node (pour CML)
-      - uses: actions/setup-node@v3
-        with:
-          node-version: "16"
+      # 3️⃣ Setup CML
+      - name: Set up CML
+        uses: iterative/setup-cml@v2
 
-      # 4. Setup CML
-      - uses: iterative/setup-cml@v1
-
-      # 5. Installer dépendances et DVC
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install dvc[s3]
-
-      # 7. Télécharger les données depuis DVC
-      - name: Pull data with DVC
+      # 4️⃣ Installation des dépendances
+      - name: Install Python deps
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
-        run: dvc pull
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install "dvc[s3]==3.63.0"
 
-      # 8. Exécuter le script Python
-      - name: Run script
-        run: python script.py
-        
-      - name: Generate Report
+      # 5️⃣ Récupération des données/modèles depuis S3
+      - name: DVC pull (restore data/models from S3)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+        run: |
+          dvc pull || echo "No remote cache yet"
+
+      # 6️⃣ Entrainement + versioning + push
+      - name: Train / Eval / Push artifacts
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+        run: |
+          # 1. Entrainement du modèle
+          python script.py
+
+          # script.py doit produire :
+          # - metrics.txt
+          # - conf_matrix.png
+          # - dossiers data/ et models/ mis à jour
+
+          # 2. Versionner les outputs
+          dvc add data models
+
+          # 3. Commit des fichiers DVC
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+
+          git add data.dvc models.dvc || true
+          [ -f dvc.lock ] && git add dvc.lock
+
+          git commit -m "Update data/models [skip ci]" || echo "Nothing to commit"
+
+          # 4. Push vers S3
+          dvc push
+
+      # 7️⃣ Publication du rapport CML
+      - name: Publish CML report
         env:
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-
-          # Get the report
           echo "## Metrics" > report.md
-          cat metrics.txt >> report.md
-
-          awk 'NR%4{print "    " $0}{print ""}' metrics.txt >> report.md
+          awk 'NR %4{ print " " $0 }{ print ""}' metrics.txt >> report.md
 
           echo "## Confusion Matrix" >> report.md
           echo "![](./conf_matrix.png)" >> report.md
+
+          # Commentaire automatique
           cml comment create report.md
