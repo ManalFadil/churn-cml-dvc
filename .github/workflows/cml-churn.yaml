@@ -21,6 +21,9 @@ jobs:
           pip install -r requirements.txt
           python script.py
 
+      - name: Pull data with DVC
+        run: dvc pull
+
       # ← Ajout de la configuration AWS ici
       - name: Configure AWS credentials
         run: |
