@@ -43,7 +43,8 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
         run: |
-          dvc pull || echo "No remote cache yet"
+          dvc pull
+          ls -R data
 
       # 6️⃣ Entrainement + versioning + push
       - name: Train / Eval / Push artifacts
